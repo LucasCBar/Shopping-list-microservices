@@ -1,0 +1,38 @@
+[
+  {
+    "id": "3473dbd0-efc4-4650-9a84-c5f61ecfb0a3",
+    "userId": "16d79f7b-ee05-4a0e-b869-92ba2bf6b279",
+    "name": "Compras da semana",
+    "description": "Mercado de sábado",
+    "status": "active",
+    "items": [
+      {
+        "itemId": "11111111-1111-4111-8111-111111111111",
+        "itemName": "Arroz Tipo 1 5kg",
+        "quantity": 3,
+        "unit": "kg",
+        "estimatedPrice": 28.9,
+        "purchased": true,
+        "notes": "",
+        "addedAt": 1758495547744
+      },
+      {
+        "itemId": "11111111-1111-4111-8111-111111111111",
+        "itemName": "Arroz Tipo 1 5kg",
+        "quantity": 5,
+        "unit": "kg",
+        "estimatedPrice": 28.9,
+        "purchased": false,
+        "notes": "",
+        "addedAt": 1758495557318
+      }
+    ],
+    "summary": {
+      "totalItems": 2,
+      "purchasedItems": 1,
+      "estimatedTotal": 231.2
+    },
+    "createdAt": 1758495387546,
+    "updatedAt": 1758495625509
+  }
+]

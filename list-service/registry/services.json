@@ -1,6 +1,6 @@
 {
-  "item-service": {
-    "url": "http://localhost:3003",
+  "list-service": {
+    "url": "http://localhost:3002",
     "health": "/health",
     "lastStatus": "UNKNOWN",
     "lastChecked": 0
