@@ -1,0 +1,16 @@
+[
+  {
+    "id": "16d79f7b-ee05-4a0e-b869-92ba2bf6b279",
+    "email": "demo1@example.com",
+    "username": "demo1",
+    "password": "$2b$10$p5t9Cqposw4w/1VDjgSbq.CTfvpsG3wrcduaId/CBP5fA5TXbaUIO",
+    "firstName": "Demo2",
+    "lastName": "",
+    "preferences": {
+      "defaultStore": "Mercado X",
+      "currency": "BRL"
+    },
+    "createdAt": 1758422241670,
+    "updatedAt": 1758424164243
+  }
+]

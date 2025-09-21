@@ -1,0 +1,8 @@
+{
+  "user-service": {
+    "url": "http://localhost:3001",
+    "health": "/health",
+    "lastStatus": "UNKNOWN",
+    "lastChecked": 0
+  }
+}
