@@ -137,8 +137,3 @@ API_Gateway --> User: lista criada (JSON)
 ```
 
 ---
-
-## 🚀 Próximos Passos
-- [ ] Criar **docker-compose.yml** para orquestrar todos os serviços.
-- [ ] Adicionar **testes automáticos** (Supertest, Jest).
-- [ ] Documentar com **OpenAPI/Swagger**.
