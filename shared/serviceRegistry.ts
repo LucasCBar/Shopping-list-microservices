@@ -1,88 +1,115 @@
+// shared/serviceRegistry.ts
 import fs from 'fs/promises';
 import path from 'path';
-import http from 'http';
 
-type ServiceEntry = {
+// ---- Tipos ----
+export type ServiceEntry = {
+  name: string;
   url: string;
-  health: string;
-  lastStatus: 'UNKNOWN' | 'UP' | 'DOWN';
-  lastChecked: number;
-  latencyMs?: number | null;
+  healthPath?: string;
+  lastSeen: number; // epoch ms
 };
 
-const REGISTRY_FILE = path.resolve(process.cwd(), 'registry/services.json');
+const REGISTRY_FILE = path.resolve(__dirname, '../registry/services.json');
 
-async function ensureRegistryFile() {
-  try { await fs.access(REGISTRY_FILE); }
-  catch {
-    await fs.mkdir(path.dirname(REGISTRY_FILE), { recursive: true });
-    await fs.writeFile(REGISTRY_FILE, JSON.stringify({}, null, 2));
+// ---- Utils de arquivo ----
+async function load(): Promise<Record<string, ServiceEntry>> {
+  try {
+    const txt = await fs.readFile(REGISTRY_FILE, 'utf8');
+    return JSON.parse(txt);
+  } catch {
+    return {};
+  }
+}
+async function save(reg: Record<string, ServiceEntry>) {
+  await fs.mkdir(path.dirname(REGISTRY_FILE), { recursive: true });
+  await fs.writeFile(REGISTRY_FILE, JSON.stringify(reg, null, 2), 'utf8');
+}
+
+// ---- API principal ----
+export async function registerService(opts: { name: string; url: string; healthPath?: string }) {
+  const reg = await load();
+  reg[opts.name] = {
+    name: opts.name,
+    url: opts.url,
+    healthPath: opts.healthPath ?? '/health',
+    lastSeen: Date.now(),
+  };
+  await save(reg);
+}
+
+export async function heartbeatService(name: string) {
+  const reg = await load();
+  const e = reg[name];
+  if (!e) return;
+  e.lastSeen = Date.now();
+  await save(reg);
+}
+
+export async function deregisterService(name: string) {
+  const reg = await load();
+  if (reg[name]) {
+    delete reg[name];
+    await save(reg);
   }
 }
 
-export async function registerService({ name, url, healthPath = '/health' }:
-  { name: string; url: string; healthPath?: string; }): Promise<void> {
-  await ensureRegistryFile();
-  const raw = await fs.readFile(REGISTRY_FILE, 'utf-8');
-  const reg = raw ? JSON.parse(raw) as Record<string, ServiceEntry> : {};
-  reg[name] = { url, health: healthPath, lastStatus: 'UNKNOWN', lastChecked: 0 };
-  await fs.writeFile(REGISTRY_FILE, JSON.stringify(reg, null, 2));
-
-  const onExit = async () => {
-    try {
-      const raw2 = await fs.readFile(REGISTRY_FILE, 'utf-8');
-      const reg2 = raw2 ? JSON.parse(raw2) as Record<string, ServiceEntry> : {};
-      if (reg2[name]) delete reg2[name];
-      await fs.writeFile(REGISTRY_FILE, JSON.stringify(reg2, null, 2));
-    } catch {}
-  };
-  process.on('SIGINT', () => { onExit().finally(() => process.exit(0)); });
-  process.on('SIGTERM', () => { onExit().finally(() => process.exit(0)); });
-}
-
-export async function getService(name: string): Promise<ServiceEntry | undefined> {
-  await ensureRegistryFile();
-  const raw = await fs.readFile(REGISTRY_FILE, 'utf-8');
-  const reg = raw ? JSON.parse(raw) as Record<string, ServiceEntry> : {};
+export async function getService(name: string) {
+  const reg = await load();
   return reg[name];
 }
-
-export async function getAllServices(): Promise<Record<string, ServiceEntry>> {
-  await ensureRegistryFile();
-  const raw = await fs.readFile(REGISTRY_FILE, 'utf-8');
-  return raw ? JSON.parse(raw) as Record<string, ServiceEntry> : {};
+export async function getAllServices() {
+  return load();
 }
 
-export async function healthCheckAll(): Promise<Record<string, ServiceEntry>> {
-  await ensureRegistryFile();
-  const raw = await fs.readFile(REGISTRY_FILE, 'utf-8');
-  const reg = raw ? JSON.parse(raw) as Record<string, ServiceEntry> : {};
-  const names = Object.keys(reg);
-  await Promise.all(names.map(async (n) => {
-    const svc = reg[n];
-    const started = Date.now();
-    try {
-      await ping(`${svc.url}${svc.health}`);
-      svc.lastStatus = 'UP';
-      svc.latencyMs = Date.now() - started;
-      svc.lastChecked = Date.now();
-    } catch {
-      svc.lastStatus = 'DOWN';
-      svc.latencyMs = null;
-      svc.lastChecked = Date.now();
-    }
-  }));
-  await fs.writeFile(REGISTRY_FILE, JSON.stringify(reg, null, 2));
-  return reg;
+// Node 18+ tem fetch global
+export async function healthCheckAll() {
+  const reg = await load();
+  const entries = Object.values(reg);
+  const result: Record<string, any> = {};
+  await Promise.all(
+    entries.map(async (s) => {
+      const url = s.url.replace(/\/+$/, '') + (s.healthPath ?? '/health');
+      try {
+        const r = await fetch(url, { method: 'GET', headers: { accept: 'application/json' }, cache: 'no-store' });
+        result[s.name] = { ok: r.ok, status: r.status, url: s.url, healthPath: s.healthPath ?? '/health' };
+      } catch (e: any) {
+        result[s.name] = { ok: false, error: String(e?.message || e), url: s.url, healthPath: s.healthPath ?? '/health' };
+      }
+    })
+  );
+  return result;
 }
 
-function ping(url: string): Promise<boolean> {
-  return new Promise((resolve, reject) => {
-    const req = http.get(url, (res) => {
-      res.resume();
-      res.statusCode && res.statusCode < 500 ? resolve(true) : reject(new Error('bad status'));
-    });
-    req.setTimeout(2000, () => { req.destroy(new Error('timeout')); });
-    req.on('error', reject);
-  });
+/** Auto-registro com heartbeat e cleanup automático em SIGINT/SIGTERM/exit. */
+export function startAutoRegistry(opts: {
+  name: string;
+  url: string;
+  healthPath?: string;
+  heartbeatMs?: number; // default 30s
+}) {
+  const { name, url, healthPath = '/health', heartbeatMs = 30_000 } = opts;
+  let timer: NodeJS.Timeout | null = null;
+  let stopped = false;
+
+  const start = async () => {
+    await registerService({ name, url, healthPath });
+    timer = setInterval(() => heartbeatService(name).catch(() => {}), heartbeatMs);
+  };
+  const stop = async () => {
+    if (stopped) return;
+    stopped = true;
+    if (timer) clearInterval(timer);
+    await deregisterService(name).catch(() => {});
+  };
+
+  // cleanup automático
+  process.on('SIGINT', () => { stop().finally(() => process.exit(0)); });
+  process.on('SIGTERM', () => { stop().finally(() => process.exit(0)); });
+  process.on('exit', () => { if (!stopped) { /* best-effort sync not guaranteed */ } });
+
+  // inicia já
+  start().catch(() => {});
+
+  return { stop };
 }

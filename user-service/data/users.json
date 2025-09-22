@@ -12,5 +12,33 @@
     },
     "createdAt": 1758422241670,
     "updatedAt": 1758424164243
+  },
+  {
+    "id": "081cc769-8d50-4715-a326-4423fd022e57",
+    "email": "gw1@example.com",
+    "username": "gw1",
+    "password": "$2b$10$m6VGsWyE6IfOOGmI4yUxYOpITjL0bk5mf8GYC5DkqfJGNyxjlCqZ6",
+    "firstName": "",
+    "lastName": "",
+    "preferences": {
+      "defaultStore": "",
+      "currency": "BRL"
+    },
+    "createdAt": 1758508986416,
+    "updatedAt": 1758508986416
+  },
+  {
+    "id": "3410862c-7f7c-4452-a5e0-6e3d109bb046",
+    "email": "demo226830@example.com",
+    "username": "demo226830",
+    "password": "$2b$10$0uMHPyzNm/WcVUoXqslugOw3LGWTHDwcUBi0Niw2mKt32xHYZ6Icu",
+    "firstName": "Demo",
+    "lastName": "",
+    "preferences": {
+      "defaultStore": "",
+      "currency": "BRL"
+    },
+    "createdAt": 1758509752959,
+    "updatedAt": 1758509752959
   }
 ]

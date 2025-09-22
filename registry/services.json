@@ -1,0 +1,20 @@
+{
+  "item-service": {
+    "name": "item-service",
+    "url": "http://localhost:3003",
+    "healthPath": "/health",
+    "lastSeen": 1758509753268
+  },
+  "user-service": {
+    "name": "user-service",
+    "url": "http://localhost:3001",
+    "healthPath": "/health",
+    "lastSeen": 1758509767099
+  },
+  "list-service": {
+    "name": "list-service",
+    "url": "http://localhost:3002",
+    "healthPath": "/health",
+    "lastSeen": 1758509743928
+  }
+}

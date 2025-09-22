@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
+import { startAutoRegistry } from '../../shared/serviceRegistry';
+
 
 import itemsRoutes from './routes/items.routes';
 import catalogRoutes from './routes/catalog.routes';
@@ -21,6 +23,7 @@ const PORT = Number(process.env.PORT) || 3003;
 
 app.listen(PORT, async () => {
   await registerService({ name: 'item-service', url: `http://localhost:${PORT}`, healthPath: '/health' });
+  startAutoRegistry({ name: 'item-service', url: `http://localhost:${PORT}`, healthPath: '/health' });
   console.log(`item-service on :${PORT}`);
 });
 
