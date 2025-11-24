@@ -60,5 +60,84 @@
     },
     "createdAt": 1758509753224,
     "updatedAt": 1758509753273
+  },
+  {
+    "id": "db9d353d-214b-4392-9155-9db83e36d510",
+    "userId": "1b52e4cc-15a1-4e24-8f3e-b4af7877e346",
+    "name": "Compras da semana",
+    "description": "Mercado de sábado",
+    "items": [
+      {
+        "itemId": "11111111-1111-4111-8111-111111111111",
+        "itemName": "Arroz Tipo 1 5kg",
+        "quantity": 2,
+        "unit": "kg",
+        "estimatedPrice": 28.9,
+        "purchased": false,
+        "notes": "",
+        "addedAt": 1764013560145
+      },
+      {
+        "itemId": "11111111-1111-4111-8111-111111111111",
+        "itemName": "Arroz Tipo 1 5kg",
+        "quantity": 2,
+        "unit": "kg",
+        "estimatedPrice": 28.9,
+        "purchased": false,
+        "notes": "",
+        "addedAt": 1764015091901
+      },
+      {
+        "itemId": "11111111-1111-4111-8111-111111111111",
+        "itemName": "Arroz Tipo 1 5kg",
+        "quantity": 2,
+        "unit": "kg",
+        "estimatedPrice": 28.9,
+        "purchased": false,
+        "notes": "",
+        "addedAt": 1764015878607
+      }
+    ],
+    "summary": {
+      "totalItems": 3,
+      "purchasedItems": 0,
+      "estimatedTotal": 173.39999999999998
+    },
+    "createdAt": 1764013471880,
+    "updatedAt": 1764015878607,
+    "status": "checked_out",
+    "checkedOutAt": 1764013806225
+  },
+  {
+    "id": "78879311-01d6-4e49-8a45-d0c0d386a731",
+    "userId": "1b52e4cc-15a1-4e24-8f3e-b4af7877e346",
+    "name": "Compras da semanaaaaaaaaa",
+    "description": "Mercado de sábadoaaaaa",
+    "items": [],
+    "summary": {
+      "totalItems": 0,
+      "purchasedItems": 0,
+      "estimatedTotal": 0
+    },
+    "createdAt": 1764015103005,
+    "updatedAt": 1764015120139,
+    "status": "checked_out",
+    "checkedOutAt": 1764015120139
+  },
+  {
+    "id": "31b4ffb8-b9dd-4022-8ce0-dafcf079dcfd",
+    "userId": "1b52e4cc-15a1-4e24-8f3e-b4af7877e346",
+    "name": "Compras da semanaaaaaaaaaaaaaaa",
+    "description": "Mercado de sábadoaaaaa",
+    "items": [],
+    "summary": {
+      "totalItems": 0,
+      "purchasedItems": 0,
+      "estimatedTotal": 0
+    },
+    "createdAt": 1764015885336,
+    "updatedAt": 1764015904720,
+    "status": "checked_out",
+    "checkedOutAt": 1764015904720
   }
 ]

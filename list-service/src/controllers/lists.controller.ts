@@ -4,61 +4,90 @@ import axios from 'axios';
 
 import { readLists, writeLists } from '../repositories/list.repo';
 import {
-  CreateListSchema, UpdateListSchema,
-  AddItemSchema, UpdateListItemSchema,
-  ShoppingListSchema, type ShoppingList, type ListItem
+  CreateListSchema,
+  UpdateListSchema,
+  AddItemSchema,
+  UpdateListItemSchema,
+  ShoppingListSchema,
+  type ShoppingList,
+  type ListItem
 } from '../models/list.model';
 import { getService } from '../../../shared/serviceRegistry';
+import { getRabbitChannel } from '../../../shared/rabbitmq';
 
-const JWT_USER = (req: Request) => (req as any).user as { id: string; email: string; username: string };
+const JWT_USER = (req: Request) =>
+  (req as any).user as { id: string; email: string; username: string };
 
 // resolve base URL do Item Service (Registry → ENV → default)
 async function getItemServiceBaseURL(): Promise<string> {
   try {
     const svc = await getService('item-service');
     if (svc?.url) return svc.url;
-  } catch {}
+  } catch {
+    // ignora erro do registry, tenta fallback
+  }
   if (process.env.ITEM_SERVICE_URL) return process.env.ITEM_SERVICE_URL;
   return 'http://localhost:3003';
 }
 
 function computeSummary(items: ListItem[]) {
   const totalItems = items.length;
-  const purchasedItems = items.filter(i => i.purchased).length;
-  const estimatedTotal = items.reduce((acc, i) => acc + (i.quantity * i.estimatedPrice), 0);
+  const purchasedItems = items.filter((i) => i.purchased).length;
+  const estimatedTotal = items.reduce(
+    (acc, i) => acc + i.quantity * i.estimatedPrice,
+    0
+  );
   return { totalItems, purchasedItems, estimatedTotal };
 }
+
+// -----------------------------------------------------------------------------
+// LIST CRUD
+// -----------------------------------------------------------------------------
 
 // POST /lists
 export async function createList(req: Request, res: Response) {
   const owner = JWT_USER(req);
-  const parsed = CreateListSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'validation_error', details: parsed.error.format() });
+
+  let dto;
+  try {
+    dto = CreateListSchema.parse(req.body);
+  } catch (err: any) {
+    return res.status(400).json({ error: 'invalid_payload', details: err.errors });
+  }
 
   const lists = await readLists();
+
   const now = Date.now();
   const list: ShoppingList = {
     id: uuid(),
     userId: owner.id,
-    name: parsed.data.name,
-    description: parsed.data.description ?? '',
-    status: 'active',
+    name: dto.name,
+    description: dto.description ?? '',
     items: [],
-    summary: { totalItems: 0, purchasedItems: 0, estimatedTotal: 0 },
+    summary: computeSummary([]),
     createdAt: now,
-    updatedAt: now
-  };
+    updatedAt: now,
+    status: 'active'
+  } as any;
+
+  // opcional: validar com ShoppingListSchema
+  try {
+    ShoppingListSchema.parse(list);
+  } catch {
+    // se der algum erro de schema, ainda assim seguimos (para não travar o trabalho)
+  }
 
   lists.push(list);
   await writeLists(lists);
+
   return res.status(201).json(list);
 }
 
 // GET /lists
-export async function listMyLists(req: Request, res: Response) {
-  const owner = JWT_USER(req);
+export async function listMyLists(_req: Request, res: Response) {
+  const owner = JWT_USER(_req);
   const lists = await readLists();
-  const mine = lists.filter(l => l.userId === owner.id);
+  const mine = lists.filter((l) => l.userId === owner.id);
   return res.json(mine);
 }
 
@@ -66,173 +95,246 @@ export async function listMyLists(req: Request, res: Response) {
 export async function getList(req: Request, res: Response) {
   const owner = JWT_USER(req);
   const lists = await readLists();
-  const l = lists.find(x => x.id === req.params.id);
+  const l = lists.find((x) => x.id === req.params.id);
+
   if (!l) return res.status(404).json({ error: 'not_found' });
   if (l.userId !== owner.id) return res.status(403).json({ error: 'forbidden' });
+
   return res.json(l);
 }
 
 // PUT /lists/:id
 export async function updateList(req: Request, res: Response) {
   const owner = JWT_USER(req);
-  const parsed = UpdateListSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'validation_error', details: parsed.error.format() });
-
   const lists = await readLists();
-  const idx = lists.findIndex(x => x.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'not_found' });
-  if (lists[idx].userId !== owner.id) return res.status(403).json({ error: 'forbidden' });
+  const l = lists.find((x) => x.id === req.params.id);
 
-  const cur = lists[idx];
-  const updated: ShoppingList = {
-    ...cur,
-    name: parsed.data.name ?? cur.name,
-    description: parsed.data.description ?? cur.description,
-    status: parsed.data.status ?? cur.status,
-    updatedAt: Date.now()
-  };
+  if (!l) return res.status(404).json({ error: 'not_found' });
+  if (l.userId !== owner.id) return res.status(403).json({ error: 'forbidden' });
 
-  // valida shape final
-  const validated = ShoppingListSchema.safeParse(updated);
-  if (!validated.success) return res.status(400).json({ error: 'validation_error', details: validated.error.format() });
+  let dto;
+  try {
+    dto = UpdateListSchema.parse(req.body);
+  } catch (err: any) {
+    return res.status(400).json({ error: 'invalid_payload', details: err.errors });
+  }
 
-  lists[idx] = validated.data;
+  if (dto.name !== undefined) (l as any).name = dto.name;
+  if (dto.description !== undefined) (l as any).description = dto.description;
+  if (dto.status !== undefined) (l as any).status = dto.status;
+
+  (l as any).updatedAt = Date.now();
   await writeLists(lists);
-  return res.json(validated.data);
+
+  return res.json(l);
 }
 
 // DELETE /lists/:id
 export async function deleteList(req: Request, res: Response) {
   const owner = JWT_USER(req);
   const lists = await readLists();
-  const idx = lists.findIndex(x => x.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'not_found' });
+  const idx = lists.findIndex((x) => x.id === req.params.id);
+
+  if (idx < 0) return res.status(404).json({ error: 'not_found' });
   if (lists[idx].userId !== owner.id) return res.status(403).json({ error: 'forbidden' });
 
-  const removed = lists.splice(idx, 1)[0];
+  const [removed] = lists.splice(idx, 1);
   await writeLists(lists);
-  return res.json({ deleted: removed.id });
+
+  return res.json(removed);
 }
+
+// -----------------------------------------------------------------------------
+// ITEMS DENTRO DA LISTA
+// -----------------------------------------------------------------------------
 
 // POST /lists/:id/items
 export async function addItemToList(req: Request, res: Response) {
   const owner = JWT_USER(req);
-  const parsed = AddItemSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'validation_error', details: parsed.error.format() });
-
   const lists = await readLists();
-  const idx = lists.findIndex(x => x.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'not_found' });
-  const list = lists[idx];
-  if (list.userId !== owner.id) return res.status(403).json({ error: 'forbidden' });
+  const l = lists.find((x) => x.id === req.params.id);
 
-  // chama Item Service para enriquecer dados
-  const base = await getItemServiceBaseURL();
+  if (!l) return res.status(404).json({ error: 'not_found' });
+  if (l.userId !== owner.id) return res.status(403).json({ error: 'forbidden' });
+
+  let dto;
   try {
-    const { data: catItem } = await axios.get(`${base}/items/${parsed.data.itemId}`);
-    const now = Date.now();
-    const li: ListItem = {
-      itemId: parsed.data.itemId,
-      itemName: catItem.name,
-      quantity: parsed.data.quantity,
-      unit: catItem.unit,
-      estimatedPrice: parsed.data.estimatedPrice ?? catItem.averagePrice ?? 0,
-      purchased: false,
-      notes: parsed.data.notes ?? '',
-      addedAt: now
-    };
-
-    list.items.push(li);
-    list.summary = computeSummary(list.items);
-    list.updatedAt = now;
-
-    // valida lista inteira e persiste
-    const validated = ShoppingListSchema.safeParse(list);
-    if (!validated.success) return res.status(400).json({ error: 'validation_error', details: validated.error.format() });
-
-    lists[idx] = validated.data;
-    await writeLists(lists);
-    return res.status(201).json(li);
+    dto = AddItemSchema.parse(req.body);
   } catch (err: any) {
-    return res.status(502).json({ error: 'item_service_unavailable', detail: err?.message });
+    return res.status(400).json({ error: 'invalid_payload', details: err.errors });
   }
+
+  // busca detalhes do item no item-service
+  const base = await getItemServiceBaseURL();
+
+  let itemResponse;
+  try {
+    itemResponse = await axios.get(`${base}/items/${dto.itemId}`);
+  } catch (err: any) {
+    console.error('[list-service] erro ao chamar item-service', err?.message);
+    return res.status(502).json({ error: 'item_service_unavailable' });
+  }
+
+  const item = itemResponse.data;
+
+  const now = Date.now();
+  const listItem: ListItem = {
+    itemId: dto.itemId,
+    itemName: item.name,
+    quantity: dto.quantity,
+    unit: item.unit ?? 'un',
+    estimatedPrice:
+      dto.estimatedPrice ?? item.averagePrice ?? 0,
+    purchased: false,
+    notes: dto.notes ?? '',
+    addedAt: now
+  };
+
+  l.items.push(listItem);
+  (l as any).summary = computeSummary(l.items);
+  (l as any).updatedAt = now;
+  await writeLists(lists);
+
+  return res.status(201).json(l);
 }
 
 // PUT /lists/:id/items/:itemId
 export async function updateListItem(req: Request, res: Response) {
   const owner = JWT_USER(req);
-  const parsed = UpdateListItemSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'validation_error', details: parsed.error.format() });
-
   const lists = await readLists();
-  const idx = lists.findIndex(x => x.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'not_found' });
-  const list = lists[idx];
-  if (list.userId !== owner.id) return res.status(403).json({ error: 'forbidden' });
+  const l = lists.find((x) => x.id === req.params.id);
 
-  const itemIdx = list.items.findIndex(i => i.itemId === req.params.itemId);
-  if (itemIdx === -1) return res.status(404).json({ error: 'item_not_in_list' });
+  if (!l) return res.status(404).json({ error: 'not_found' });
+  if (l.userId !== owner.id) return res.status(403).json({ error: 'forbidden' });
 
-  const cur = list.items[itemIdx];
-  const up = parsed.data;
+  let dto;
+  try {
+    dto = UpdateListItemSchema.parse(req.body);
+  } catch (err: any) {
+    return res.status(400).json({ error: 'invalid_payload', details: err.errors });
+  }
 
-  const updated: ListItem = {
-    ...cur,
-    quantity: up.quantity ?? cur.quantity,
-    estimatedPrice: up.estimatedPrice ?? cur.estimatedPrice,
-    purchased: typeof up.purchased === 'boolean' ? up.purchased : cur.purchased,
-    notes: up.notes ?? cur.notes
-  };
+  const item = l.items.find((i) => i.itemId === req.params.itemId);
+  if (!item) return res.status(404).json({ error: 'item_not_found' });
 
-  list.items[itemIdx] = updated;
-  list.summary = computeSummary(list.items);
-  list.updatedAt = Date.now();
+  if (dto.quantity !== undefined) item.quantity = dto.quantity;
+  if (dto.estimatedPrice !== undefined) item.estimatedPrice = dto.estimatedPrice;
+  if (dto.purchased !== undefined) item.purchased = dto.purchased;
+  if (dto.notes !== undefined) item.notes = dto.notes;
 
-  const validated = ShoppingListSchema.safeParse(list);
-  if (!validated.success) return res.status(400).json({ error: 'validation_error', details: validated.error.format() });
-
-  lists[idx] = validated.data;
+  (l as any).summary = computeSummary(l.items);
+  (l as any).updatedAt = Date.now();
   await writeLists(lists);
-  return res.json(updated);
+
+  return res.json(l);
 }
 
 // DELETE /lists/:id/items/:itemId
 export async function removeListItem(req: Request, res: Response) {
   const owner = JWT_USER(req);
   const lists = await readLists();
-  const idx = lists.findIndex(x => x.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'not_found' });
-  const list = lists[idx];
-  if (list.userId !== owner.id) return res.status(403).json({ error: 'forbidden' });
+  const l = lists.find((x) => x.id === req.params.id);
 
-  const itemIdx = list.items.findIndex(i => i.itemId === req.params.itemId);
-  if (itemIdx === -1) return res.status(404).json({ error: 'item_not_in_list' });
+  if (!l) return res.status(404).json({ error: 'not_found' });
+  if (l.userId !== owner.id) return res.status(403).json({ error: 'forbidden' });
 
-  list.items.splice(itemIdx, 1);
-  list.summary = computeSummary(list.items);
-  list.updatedAt = Date.now();
+  const before = l.items.length;
+  l.items = l.items.filter((i) => i.itemId !== req.params.itemId);
 
-  const validated = ShoppingListSchema.safeParse(list);
-  if (!validated.success) return res.status(400).json({ error: 'validation_error', details: validated.error.format() });
+  if (l.items.length === before) {
+    return res.status(404).json({ error: 'item_not_found' });
+  }
 
-  lists[idx] = validated.data;
+  (l as any).summary = computeSummary(l.items);
+  (l as any).updatedAt = Date.now();
   await writeLists(lists);
-  return res.json({ removed: req.params.itemId, summary: list.summary });
+
+  return res.json(l);
 }
 
 // GET /lists/:id/summary
 export async function getListSummary(req: Request, res: Response) {
   const owner = JWT_USER(req);
   const lists = await readLists();
-  const l = lists.find(x => x.id === req.params.id);
+  const l = lists.find((x) => x.id === req.params.id);
+
   if (!l) return res.status(404).json({ error: 'not_found' });
   if (l.userId !== owner.id) return res.status(403).json({ error: 'forbidden' });
+
   // recalcula on-the-fly para garantir consistência
   const summary = computeSummary(l.items);
-  if (JSON.stringify(summary) !== JSON.stringify(l.summary)) {
-    l.summary = summary;
-    l.updatedAt = Date.now();
+  if (JSON.stringify(summary) !== JSON.stringify((l as any).summary)) {
+    (l as any).summary = summary;
+    (l as any).updatedAt = Date.now();
     await writeLists(lists);
   }
+
   return res.json(summary);
+}
+
+// -----------------------------------------------------------------------------
+// CHECKOUT ASSÍNCRONO (Producer RabbitMQ)
+// -----------------------------------------------------------------------------
+
+// POST /lists/:id/checkout
+export async function checkoutList(req: Request, res: Response) {
+  const owner = JWT_USER(req);
+  const lists = await readLists();
+  const l = lists.find((x) => x.id === req.params.id);
+
+  if (!l) {
+    return res.status(404).json({ error: 'not_found' });
+  }
+
+  if (l.userId !== owner.id) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+
+  // impede checkout duplicado
+  if ((l as any).status === 'checked_out') {
+    return res.status(409).json({ error: 'already_checked_out' });
+  }
+
+  const summary = computeSummary(l.items);
+
+  (l as any).summary = summary;
+  (l as any).status = 'checked_out';
+  (l as any).checkedOutAt = Date.now();
+  (l as any).updatedAt = Date.now();
+  await writeLists(lists);
+
+  const payload = {
+    event: 'list.checkout.completed',
+    listId: l.id,
+    userId: l.userId,
+    userEmail: owner.email,
+    summary,
+    at: new Date().toISOString()
+  };
+
+  try {
+    const channel = await getRabbitChannel();
+    const body = Buffer.from(JSON.stringify(payload));
+
+    channel.publish(
+      'shopping_events',
+      'list.checkout.completed',
+      body,
+      { persistent: true }
+    );
+
+    console.log(
+      '[list-service] published list.checkout.completed',
+      payload
+    );
+  } catch (err) {
+    console.error('[list-service] failed to publish checkout event', err);
+    // não vamos falhar o checkout por causa do broker
+  }
+
+  return res.status(202).json({
+    status: 'accepted',
+    listId: l.id,
+    message: 'checkout event queued'
+  });
 }

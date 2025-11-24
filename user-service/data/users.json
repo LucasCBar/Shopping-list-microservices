@@ -40,5 +40,19 @@
     },
     "createdAt": 1758509752959,
     "updatedAt": 1758509752959
+  },
+  {
+    "id": "1b52e4cc-15a1-4e24-8f3e-b4af7877e346",
+    "email": "demo2@example.com",
+    "username": "toma lerda 2",
+    "password": "$2b$10$m7YMZebtkEnuIdUebva2Hud8bu5.kc16N9i9TW1yeNhfeuXHFHfNC",
+    "firstName": "Demo",
+    "lastName": "",
+    "preferences": {
+      "defaultStore": "",
+      "currency": "BRL"
+    },
+    "createdAt": 1764013354198,
+    "updatedAt": 1764013354198
   }
 ]
