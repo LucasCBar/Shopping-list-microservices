@@ -28,11 +28,5 @@ export async function getRabbitChannel(): Promise<Channel> {
 
   channel = await conn.createChannel();
 
-  // ❌ REMOVER ESSA PARTE (é ela que está dando conflito):
-  // await channel!.assertExchange('shopping_events', 'topic', {
-  //   durable: true,
-  // });
-
-  // ✅ Só devolve o canal, assumindo que o exchange já existe (criado via UI)
   return channel!;
 }

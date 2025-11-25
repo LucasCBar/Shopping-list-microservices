@@ -3,18 +3,18 @@
     "name": "item-service",
     "url": "http://localhost:3003",
     "healthPath": "/health",
-    "lastSeen": 1764016018716
+    "lastSeen": 1764031482783
   },
   "user-service": {
     "name": "user-service",
     "url": "http://localhost:3001",
     "healthPath": "/health",
-    "lastSeen": 1764016039729
+    "lastSeen": 1764031476869
   },
   "list-service": {
     "name": "list-service",
     "url": "http://localhost:3002",
     "healthPath": "/health",
-    "lastSeen": 1764016035212
+    "lastSeen": 1764031468189
   }
 }

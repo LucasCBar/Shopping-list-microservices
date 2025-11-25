@@ -139,5 +139,37 @@
     "updatedAt": 1764015904720,
     "status": "checked_out",
     "checkedOutAt": 1764015904720
+  },
+  {
+    "id": "fb20bde1-af9a-457b-9990-b744da6d7eaf",
+    "userId": "21662c55-d2e3-4684-a36c-0f44835a76fa",
+    "name": "2 do trabalho",
+    "description": "pro betao e pro tavin",
+    "items": [],
+    "summary": {
+      "totalItems": 0,
+      "purchasedItems": 0,
+      "estimatedTotal": 0
+    },
+    "createdAt": 1764030665462,
+    "updatedAt": 1764030768395,
+    "status": "checked_out",
+    "checkedOutAt": 1764030768395
+  },
+  {
+    "id": "9b93a88b-e61e-4731-b4b0-16ce3caa4691",
+    "userId": "21662c55-d2e3-4684-a36c-0f44835a76fa",
+    "name": "busco prazer",
+    "description": "pro betao e pro tavin",
+    "items": [],
+    "summary": {
+      "totalItems": 0,
+      "purchasedItems": 0,
+      "estimatedTotal": 0
+    },
+    "createdAt": 1764031282913,
+    "updatedAt": 1764031319629,
+    "status": "checked_out",
+    "checkedOutAt": 1764031319629
   }
 ]
